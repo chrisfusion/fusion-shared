@@ -1,6 +1,6 @@
 # Plan: package `ownership` (fusion-shared)
 
-Step 1 of the rollout in `multi-tenancy.md` (section 5). Status: **approved, in progress (steps 1-3 done).** Wish numbers (W..) refer to `multi-tenancy.md`.
+Step 1 of the rollout in `multi-tenancy.md` (section 5). Status: **steps 1-8 implemented and reviewed; tag `v0.1.0` pending the owner's OK.** Wish numbers (W..) refer to `multi-tenancy.md`.
 
 ## 1. Scope
 
@@ -83,3 +83,9 @@ When a selector would be too long, the caller filters in memory with `CanRead`.
 4. A trusted proxy without headers gets an empty scope, not an error.
 5. This plan is kept as a file in `docs/`.
 6. (Step 3) The config list is called `principals`, not `serviceAccounts`: it also holds API keys and OIDC subjects (W38). Entry modes are exclusive: `trustedProxy`, `allGroups`, `groups` (+ `writableGroups`) or `assertableGroups`.
+
+## 9. Implementation notes (deviations from the sketch above)
+
+- Config key `principals` (decision 6). `SQLClause` and `LabelSelector` panic on a malformed column or label key (constants by contract) instead of returning an error.
+- Added: `Scope.Email`, `Scope.Headers()` (proxies forward the user's scope), `Resolver.Attach` (shared by the net/http and Gin middleware), `ErrUnknownPrincipal` (403 while enforcing for callers without a config entry), `Scope.Sees()`, `Filter`, label/column constants and helpers, `make fuzz` / `make tidy`.
+- Review findings fixed before v0.1.0: pods with `assertableGroups` can no longer claim a user id; an unenforced trusted proxy keeps the forwarded scope so it can pass it on while upstream services already enforce.

@@ -92,6 +92,7 @@ func TestResolve_TrustedProxy(t *testing.T) {
 	t.Run("user scope from headers", func(t *testing.T) {
 		s, err := r.Resolve(pBFF, hdr(
 			HeaderUserID, "u-1",
+			HeaderUserEmail, "a@corp.com",
 			HeaderGroups, "alice,team-data,shared",
 			HeaderWritableGroups, "alice,team-data",
 			HeaderDefaultGroup, "alice",
@@ -99,7 +100,7 @@ func TestResolve_TrustedProxy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if s.Principal != pBFF || s.UserID != "u-1" || s.Service || s.All || s.DefaultGroup != "alice" {
+		if s.Principal != pBFF || s.UserID != "u-1" || s.Email != "a@corp.com" || s.Service || s.All || s.DefaultGroup != "alice" {
 			t.Fatalf("unexpected scope: %+v", s)
 		}
 		if !reflect.DeepEqual(s.Read, []string{"alice", "team-data", "shared"}) || !reflect.DeepEqual(s.Write, []string{"alice", "team-data"}) {
@@ -204,6 +205,10 @@ func TestResolve_AssertableGroups(t *testing.T) {
 		t.Fatal("pods are service callers")
 	}
 
+	if s.UserID != "" || s.Email != "" {
+		t.Fatalf("a pod must not be able to claim a user identity: %+v", s)
+	}
+
 	empty, _ := r.Resolve(pJobs, http.Header{})
 	if !empty.IsEmpty() {
 		t.Fatalf("no assertion means no access, got %+v", empty)
@@ -232,9 +237,15 @@ func TestResolve_Unenforced(t *testing.T) {
 		t.Fatalf("owner = %q, %v; want the legacy group", owner, err)
 	}
 
+	// An unenforced proxy keeps the forwarded scope so it can pass it on.
+	fwd, _ := r.Resolve(pBFF, hdr(HeaderGroups, "alice,shared", HeaderWritableGroups, "alice", HeaderAllGroups, "true"))
+	if !fwd.Unenforced || !fwd.All || !reflect.DeepEqual(fwd.Read, []string{"alice", "shared"}) || !reflect.DeepEqual(fwd.Write, []string{"alice"}) {
+		t.Fatalf("forwarded scope lost while unenforced: %+v", fwd)
+	}
+
 	// Headers from a non-proxy are still ignored while unenforced.
-	ci, _ := r.Resolve(pCI, hdr(HeaderDefaultGroup, "victim", HeaderUserID, "root"))
-	if ci.DefaultGroup != "" || ci.UserID != "" {
+	ci, _ := r.Resolve(pCI, hdr(HeaderDefaultGroup, "victim", HeaderUserID, "root", HeaderAllGroups, "true", HeaderGroups, "victim"))
+	if ci.DefaultGroup != "" || ci.UserID != "" || ci.All || len(ci.Read) != 0 {
 		t.Fatalf("headers from a non-proxy leaked: %+v", ci)
 	}
 }
@@ -321,4 +332,28 @@ func FuzzResolve(f *testing.F) {
 			t.Fatal("scope writes a group it does not hold")
 		}
 	})
+}
+
+func TestScope_HeadersForwarding(t *testing.T) {
+	r := newTestResolver(t, true)
+	in := hdr(
+		HeaderUserID, "u-1", HeaderUserEmail, "a@corp.com",
+		HeaderGroups, "alice,shared", HeaderWritableGroups, "alice", HeaderDefaultGroup, "alice",
+	)
+	received, _ := r.Resolve(pBFF, in)
+
+	// A proxy passes the scope on unchanged, enforcing or not.
+	for _, enforce := range []bool{true, false} {
+		res := newTestResolver(t, enforce)
+		sc, _ := res.Resolve(pBFF, in)
+		out := http.Header{}
+		if err := FormatHeaders(out, sc.Headers()); err != nil {
+			t.Fatal(err)
+		}
+		again, _ := r.Resolve(pBFF, out)
+		if !reflect.DeepEqual(again.Read, received.Read) || !reflect.DeepEqual(again.Write, received.Write) ||
+			again.UserID != "u-1" || again.Email != "a@corp.com" || again.DefaultGroup != "alice" || again.All {
+			t.Fatalf("enforce=%v: forwarded scope differs: %+v", enforce, again)
+		}
+	}
 }

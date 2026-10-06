@@ -17,6 +17,9 @@ var (
 	ErrForbidden = errors.New("write access to the owner group denied")
 	// ErrOwnerRequired: a create named no owner group and none could be defaulted.
 	ErrOwnerRequired = errors.New("an owner group must be named")
+	// ErrUnknownPrincipal: enforcement is on and the caller has no entry in the
+	// ownership config. Answer 403.
+	ErrUnknownPrincipal = errors.New("principal is not configured")
 )
 
 // Scope is what a caller may do: which owner groups it can see and write, or
@@ -26,9 +29,11 @@ var (
 // example in tests); do not modify its fields after first use.
 type Scope struct {
 	// Principal is the authenticated caller (service account, API key, ...),
-	// for audit logs. UserID is the end user for user requests.
+	// for audit logs. UserID and Email identify the end user for requests
+	// forwarded by a trusted proxy.
 	Principal string
 	UserID    string
+	Email     string
 
 	// Read lists the owner groups the caller may see; Write the subset it may
 	// change. Write must be a subset of Read.
@@ -57,6 +62,18 @@ func newScope(s Scope) Scope {
 	s.Read, s.readSet = dedupe(s.Read)
 	s.Write, s.writeSet = dedupe(s.Write)
 	return s
+}
+
+// Headers returns the trusted headers for passing this scope on to an upstream
+// service, for proxies such as weave and wizard that call other services on
+// behalf of the user (use FormatHeaders). It carries the scope as received, so
+// it is the same whether or not this service enforces yet.
+func (s Scope) Headers() Headers {
+	return Headers{
+		UserID: s.UserID, Email: s.Email,
+		Groups: s.Read, Writable: s.Write,
+		All: s.All, DefaultGroup: s.DefaultGroup,
+	}
 }
 
 // IsEmpty reports whether the scope can see nothing at all.
@@ -175,13 +192,16 @@ func (s Scope) defaultOwner() string {
 }
 
 // HTTPStatus maps an ownership error to an HTTP status code: 404 for
-// ErrNotVisible, 403 for ErrForbidden, 400 for ErrOwnerRequired and
-// ErrInvalidGroupName, 401 for ErrNoPrincipal, 500 for anything else.
+// ErrNotVisible, 403 for ErrForbidden and ErrUnknownPrincipal, 400 for
+// ErrOwnerRequired and ErrInvalidGroupName, 401 for ErrNoPrincipal, 500 for
+// anything else. A nil error gives 200.
 func HTTPStatus(err error) int {
 	switch {
+	case err == nil:
+		return http.StatusOK
 	case errors.Is(err, ErrNotVisible):
 		return http.StatusNotFound
-	case errors.Is(err, ErrForbidden):
+	case errors.Is(err, ErrForbidden), errors.Is(err, ErrUnknownPrincipal):
 		return http.StatusForbidden
 	case errors.Is(err, ErrOwnerRequired), errors.Is(err, ErrInvalidGroupName):
 		return http.StatusBadRequest

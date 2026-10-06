@@ -214,6 +214,7 @@ func TestHTTPStatus(t *testing.T) {
 		err  error
 		want int
 	}{
+		{nil, http.StatusOK},
 		{ErrNotVisible, http.StatusNotFound},
 		{ErrForbidden, http.StatusForbidden},
 		{ErrOwnerRequired, http.StatusBadRequest},

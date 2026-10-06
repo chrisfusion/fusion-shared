@@ -88,9 +88,10 @@ func (r *Resolver) Resolve(principal string, h http.Header) (Scope, error) {
 		return newScope(Scope{Principal: principal, Service: true, All: true}), nil
 	case len(entry.AssertableGroups) > 0:
 		hdr := ParseHeaders(h)
+		// Pods are not trusted for identity: the asserted user id is ignored so
+		// it cannot be forged into audit logs.
 		return newScope(Scope{
 			Principal: principal,
-			UserID:    hdr.UserID,
 			Service:   true,
 			Read:      intersect(hdr.Groups, entry.AssertableGroups),
 		}), nil
@@ -123,6 +124,7 @@ func (r *Resolver) fromHeaders(principal string, h http.Header) Scope {
 	return newScope(Scope{
 		Principal:    principal,
 		UserID:       hdr.UserID,
+		Email:        hdr.Email,
 		Read:         hdr.Groups,
 		Write:        write,
 		All:          hdr.All,
@@ -131,15 +133,21 @@ func (r *Resolver) fromHeaders(principal string, h http.Header) Scope {
 }
 
 // unenforced builds the scope used while enforcement is off: every check passes,
-// and creates still record an owner. Trusted proxies still supply the user and
-// the default group.
+// and creates still record an owner. Trusted proxies still supply the user, the
+// default group and the forwarded scope.
 func (r *Resolver) unenforced(principal string, entry PrincipalEntry, known bool, h http.Header) Scope {
 	s := Scope{Principal: principal, Unenforced: true, LegacyGroup: r.cfg.LegacyGroup, Service: true}
 	if known && entry.TrustedProxy {
 		hdr := ParseHeaders(h)
 		s.Service = false
 		s.UserID = hdr.UserID
+		s.Email = hdr.Email
 		s.DefaultGroup = hdr.DefaultGroup
+		// Keep the forwarded scope so a proxy that is not enforcing yet can still
+		// pass it on to upstream services that are (see Scope.Headers).
+		s.Read = hdr.Groups
+		s.Write = intersect(hdr.Writable, hdr.Groups)
+		s.All = hdr.All
 	}
 	return newScope(s)
 }

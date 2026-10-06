@@ -11,7 +11,8 @@ Shared Go packages and cross-project documentation for the fusion platform.
 |---|---|
 | `docs/multi-tenancy.md` | Ownership / owner-group plan shared by all fusion services: requirements, design, rollout |
 | `docs/logging_principles.md` | Logging rules for all fusion services |
-| `ownership/` | _Planned._ Scope, trusted-header parsing and SQL / label-selector builders for owner-group enforcement |
+| `ownership/` | Owner-group scoping: names, trusted headers, scope decisions, config, resolver, SQL / label-selector builders, `net/http` middleware |
+| `ownership/ginmw/` | Gin adapter for the `ownership` middleware |
 
 ## Usage
 
@@ -23,6 +24,31 @@ make vendor   # commit vendor/ together with go.mod and go.sum
 ```
 
 Do not commit a `replace` directive. For local co-development use a `go.work` file (gitignored).
+
+## Quick start: `ownership`
+
+```go
+cfg, err := ownership.Load("/etc/fusion/ownership.yaml")
+if err == nil { err = cfg.Validate(authEnabled) } // refuses enforcement without authentication
+res, err := ownership.NewResolver(cfg, ownership.WithLogger(logger))
+
+// after the service's own authentication (net/http or chi):
+r.Use(res.Middleware(func(r *http.Request) string { return principalOf(r) }))
+// or with Gin:  router.Use(ginmw.Middleware(res, func(c *gin.Context) string { return principalOf(c) }))
+
+scope, _ := ownership.FromContext(req.Context()) // ginmw.Scope(c) with Gin
+
+clause, args := ownership.SQLClause(scope, ownership.ColumnOwnerGroup, 1) // list: WHERE (clause)
+err = scope.CheckWrite(owner)                                              // update / delete
+owner, err := scope.ResolveCreateOwner(requested)                          // create
+err = scope.CheckMove(from, to)                                            // move owner group
+```
+
+Map errors with `ownership.HTTPStatus(err)` and `ownership.ErrorMessage(err)`. The package documentation (`go doc ./ownership`) and the runnable examples describe every function; the rules are in [docs/multi-tenancy.md](docs/multi-tenancy.md).
+
+## Development
+
+`make test` (gofmt check, `go vet`, race tests), `make fuzz`, `make bench` and `make tidy` all run inside the `golang:1.25` Docker image.
 
 ## Versioning
 
