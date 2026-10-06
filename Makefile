@@ -9,7 +9,7 @@ DOCKER_RUN = docker run --rm \
 	-e GOCACHE=/src/.cache/build -e GOMODCACHE=/src/.cache/mod \
 	$(GO_IMAGE)
 
-.PHONY: test vet fmt-check bench
+.PHONY: test vet fmt-check bench fuzz
 
 ## test: go vet, gofmt check and unit tests with the race detector
 test: fmt-check vet
@@ -26,3 +26,10 @@ fmt-check:
 ## bench: run benchmarks (no unit tests)
 bench:
 	$(DOCKER_RUN) go test -run '^$$' -bench . -benchmem ./...
+
+## fuzz: run every fuzz test for FUZZTIME (default 10s each)
+FUZZTIME ?= 10s
+fuzz:
+	@for f in $$($(DOCKER_RUN) go test -list '^Fuzz' ./ownership | grep '^Fuzz'); do \
+		echo "== $$f"; $(DOCKER_RUN) go test ./ownership -run '^$$' -fuzz "^$$f$$" -fuzztime $(FUZZTIME) || exit 1; \
+	done
