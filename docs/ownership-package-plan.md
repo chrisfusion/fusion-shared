@@ -1,6 +1,6 @@
 # Plan: package `ownership` (fusion-shared)
 
-Step 1 of the rollout in `multi-tenancy.md` (section 5). Status: **approved, not started.** Wish numbers (W..) refer to `multi-tenancy.md`.
+Step 1 of the rollout in `multi-tenancy.md` (section 5). Status: **approved, in progress (steps 1-3 done).** Wish numbers (W..) refer to `multi-tenancy.md`.
 
 ## 1. Scope
 
@@ -82,3 +82,4 @@ When a selector would be too long, the caller filters in memory with `CanRead`.
 3. Config is loaded once at startup; a changed ConfigMap needs a pod restart, no file watching.
 4. A trusted proxy without headers gets an empty scope, not an error.
 5. This plan is kept as a file in `docs/`.
+6. (Step 3) The config list is called `principals`, not `serviceAccounts`: it also holds API keys and OIDC subjects (W38). Entry modes are exclusive: `trustedProxy`, `allGroups`, `groups` (+ `writableGroups`) or `assertableGroups`.

@@ -9,7 +9,7 @@ DOCKER_RUN = docker run --rm \
 	-e GOCACHE=/src/.cache/build -e GOMODCACHE=/src/.cache/mod \
 	$(GO_IMAGE)
 
-.PHONY: test vet fmt-check bench fuzz
+.PHONY: test vet fmt-check bench fuzz tidy
 
 ## test: go vet, gofmt check and unit tests with the race detector
 test: fmt-check vet
@@ -20,7 +20,7 @@ vet:
 
 ## fmt-check: fail if any file is not gofmt-formatted
 fmt-check:
-	@out=$$($(DOCKER_RUN) gofmt -l .); \
+	@out=$$($(DOCKER_RUN) sh -c "find . -name '*.go' -not -path './.cache/*' | xargs gofmt -l"); \
 	if [ -n "$$out" ]; then echo "not gofmt-formatted:"; echo "$$out"; exit 1; fi
 
 ## bench: run benchmarks (no unit tests)
@@ -33,3 +33,7 @@ fuzz:
 	@for f in $$($(DOCKER_RUN) go test -list '^Fuzz' ./ownership | grep '^Fuzz'); do \
 		echo "== $$f"; $(DOCKER_RUN) go test ./ownership -run '^$$' -fuzz "^$$f$$" -fuzztime $(FUZZTIME) || exit 1; \
 	done
+
+## tidy: go mod tidy (needs network)
+tidy:
+	$(DOCKER_RUN) go mod tidy
