@@ -154,7 +154,7 @@ Model: "like Linux".
 - ~~Q28~~ answered by investigation, see section 2: no owner needed in content, fleet, grafana, testcases, runner (but see Q32); ext-system-bff see Q33; spectra GUI only; testbed test data.
 - ~~Q29~~ answered by investigation: owner on DB table `venv_build` and on the CRs `CIBuild` and `GitWatcher`; builds triggered by a watcher inherit the watcher's owner and a build's CR copies the build's owner (explicit copy, like weave triggers→runs).
 - ~~Q30~~ answered: W39.
-- ~~Q31~~ done: `fusion-shared` committed and pushed (365a4a7); plan pointers added to the `CLAUDE.md` of bff, forge, index, flux (weave), wizard, ext-system-bff, runner, spectra (uncommitted in those repos); the parent directory's local git is left untouched.
+- ~~Q31~~ done: `fusion-shared` committed and pushed (341a046); plan pointers added to the `CLAUDE.md` of bff, forge, index, flux (weave), wizard, ext-system-bff, runner, spectra (uncommitted in those repos); the parent directory's local git is left untouched.
 - ~~Q32~~ answered: W36.
 - ~~Q33~~ answered: W37.
 - ~~Q34~~ answered: W38.
