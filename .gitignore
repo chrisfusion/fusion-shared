@@ -36,3 +36,6 @@ go.work.sum
 
 # OS
 .DS_Store
+
+# Local build/module cache used by the Makefile
+.cache/
