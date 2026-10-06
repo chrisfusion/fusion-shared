@@ -1,0 +1,38 @@
+# VS Code
+.vscode/
+
+# JetBrains (GoLand / IntelliJ)
+.idea/
+*.iml
+
+# Emacs
+*~
+\#*\#
+.\#*
+*.elc
+.dir-locals.el
+
+# Vim
+*.swp
+*.swo
+*.swn
+Session.vim
+
+# Go build artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Local workspace (co-development, never committed)
+go.work
+go.work.sum
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
